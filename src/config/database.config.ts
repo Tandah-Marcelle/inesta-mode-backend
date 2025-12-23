@@ -11,7 +11,7 @@ export const getDatabaseConfig = (
     host: configService.get<string>('DB_HOST', 'localhost'),
     port: configService.get<number>('DB_PORT', 5432),
     username: configService.get<string>('DB_USERNAME', 'postgres'),
-    password: password || undefined, // Use undefined instead of empty string
+    password: password || '', // Use empty string instead of undefined for PostgreSQL
     database: configService.get<string>('DB_DATABASE', 'inesta_mode'),
     entities: [__dirname + '/../**/*.entity{.ts,.js}'],
     synchronize: configService.get<string>('NODE_ENV') === 'development',

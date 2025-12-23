@@ -7,14 +7,17 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { TokenBlacklistService } from './token-blacklist.service';
+import { SecurityService } from './security.service';
 import { JwtBlacklistGuard } from './guards/jwt-blacklist.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
 import { User } from '../entities/user.entity';
 import { UserPermission } from '../entities/user-permission.entity';
+import { UserSession } from '../entities/user-session.entity';
+import { SecurityLog } from '../entities/security-log.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, UserPermission]),
+    TypeOrmModule.forFeature([User, UserPermission, UserSession, SecurityLog]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -27,8 +30,8 @@ import { UserPermission } from '../entities/user-permission.entity';
       inject: [ConfigService],
     }),
   ],
-  providers: [AuthService, JwtStrategy, TokenBlacklistService, JwtBlacklistGuard, PermissionsGuard],
+  providers: [AuthService, JwtStrategy, TokenBlacklistService, SecurityService, JwtBlacklistGuard, PermissionsGuard],
   controllers: [AuthController],
-  exports: [AuthService, JwtStrategy, TokenBlacklistService, JwtBlacklistGuard, PermissionsGuard, PassportModule],
+  exports: [AuthService, JwtStrategy, TokenBlacklistService, SecurityService, JwtBlacklistGuard, PermissionsGuard, PassportModule],
 })
 export class AuthModule {}

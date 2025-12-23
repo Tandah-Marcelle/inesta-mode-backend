@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as crypto from 'crypto';
+import { SupabaseStorageService } from './supabase-storage.service';
 
 export interface UploadedFile {
   originalName: string;
@@ -17,6 +18,7 @@ export interface UploadedFile {
 export class UploadService {
   private readonly uploadPath: string;
   private readonly maxFileSize: number;
+  private readonly useSupabase: boolean;
   private readonly allowedMimeTypes = [
     'image/jpeg',
     'image/jpg',
@@ -25,12 +27,75 @@ export class UploadService {
     'image/gif'
   ];
 
-  constructor(private readonly configService: ConfigService) {
-    this.uploadPath = this.configService.get<string>('UPLOAD_DEST', './uploads');
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly supabaseStorageService: SupabaseStorageService,
+  ) {
+    const uploadDest = this.configService.get<string>('UPLOAD_DEST', 'uploads');
+    this.uploadPath = path.isAbsolute(uploadDest) 
+      ? uploadDest 
+      : path.join(process.cwd(), uploadDest);
     this.maxFileSize = this.configService.get<number>('MAX_FILE_SIZE', 5242880); // 5MB
+    
+    // Use Supabase if configured
+    this.useSupabase = !!(
+      this.configService.get<string>('SUPABASE_URL') && 
+      this.configService.get<string>('SUPABASE_ANON_KEY')
+    );
   }
 
   async saveFile(file: Express.Multer.File, folder = 'images'): Promise<UploadedFile> {
+    if (this.useSupabase) {
+      return this.supabaseStorageService.saveFile(file, folder);
+    }
+
+    // Fallback to local storage
+    return this.saveFileLocally(file, folder);
+  }
+
+  async saveMultipleFiles(
+    files: Express.Multer.File[],
+    folder = 'images'
+  ): Promise<UploadedFile[]> {
+    if (this.useSupabase) {
+      return this.supabaseStorageService.saveMultipleFiles(files, folder);
+    }
+
+    // Fallback to local storage
+    const uploadPromises = files.map(file => this.saveFileLocally(file, folder));
+    return Promise.all(uploadPromises);
+  }
+
+  async deleteFile(filePath: string): Promise<void> {
+    if (this.useSupabase) {
+      return this.supabaseStorageService.deleteFile(filePath);
+    }
+
+    // Fallback to local storage
+    return this.deleteFileLocally(filePath);
+  }
+
+  async deleteMultipleFiles(filePaths: string[]): Promise<void> {
+    if (this.useSupabase) {
+      return this.supabaseStorageService.deleteMultipleFiles(filePaths);
+    }
+
+    // Fallback to local storage
+    const deletePromises = filePaths.map(filePath => this.deleteFileLocally(filePath));
+    await Promise.allSettled(deletePromises);
+  }
+
+  // Utility methods for different upload types
+  async uploadProductImages(files: Express.Multer.File[]): Promise<UploadedFile[]> {
+    return this.saveMultipleFiles(files, 'products');
+  }
+
+  async uploadCategoryImage(file: Express.Multer.File): Promise<UploadedFile> {
+    return this.saveFile(file, 'categories');
+  }
+
+  // Local storage methods (fallback)
+  private async saveFileLocally(file: Express.Multer.File, folder = 'images'): Promise<UploadedFile> {
     // Validate file
     this.validateFile(file);
 
@@ -59,15 +124,7 @@ export class UploadService {
     }
   }
 
-  async saveMultipleFiles(
-    files: Express.Multer.File[],
-    folder = 'images'
-  ): Promise<UploadedFile[]> {
-    const uploadPromises = files.map(file => this.saveFile(file, folder));
-    return Promise.all(uploadPromises);
-  }
-
-  async deleteFile(filePath: string): Promise<void> {
+  private async deleteFileLocally(filePath: string): Promise<void> {
     try {
       // Convert URL to file system path
       const systemPath = filePath.startsWith('/uploads/')
@@ -79,11 +136,6 @@ export class UploadService {
       // File might not exist, which is okay
       console.warn(`Could not delete file: ${filePath}`, error.message);
     }
-  }
-
-  async deleteMultipleFiles(filePaths: string[]): Promise<void> {
-    const deletePromises = filePaths.map(filePath => this.deleteFile(filePath));
-    await Promise.allSettled(deletePromises);
   }
 
   private validateFile(file: Express.Multer.File): void {
@@ -119,14 +171,5 @@ export class UploadService {
     } catch {
       await fs.mkdir(dirPath, { recursive: true });
     }
-  }
-
-  // Utility methods for different upload types
-  async uploadProductImages(files: Express.Multer.File[]): Promise<UploadedFile[]> {
-    return this.saveMultipleFiles(files, 'products');
-  }
-
-  async uploadCategoryImage(file: Express.Multer.File): Promise<UploadedFile> {
-    return this.saveFile(file, 'categories');
   }
 }

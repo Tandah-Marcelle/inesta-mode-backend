@@ -67,6 +67,50 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   lastLoginAt: Date;
 
+  // Security fields
+  @Column({ type: 'boolean', default: false })
+  isMfaEnabled: boolean;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Exclude()
+  mfaSecret: string | null;
+
+  @Column({ type: 'json', nullable: true })
+  @Exclude()
+  backupCodes: string[] | null;
+
+  @Column({ type: 'int', default: 0 })
+  failedLoginAttempts: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  lockedUntil: Date | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Exclude()
+  passwordResetToken: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  passwordResetExpires: Date | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Exclude()
+  emailVerificationToken: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  emailVerificationExpires: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  passwordChangedAt: Date | null;
+
+  @Column({ type: 'boolean', default: false })
+  requirePasswordChange: boolean;
+
+  @Column({ type: 'varchar', length: 45, nullable: true })
+  lastLoginIp: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  lastLoginUserAgent: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -86,5 +130,18 @@ export class User {
   // Virtual field for full name
   get fullName(): string {
     return `${this.firstName} ${this.lastName}`;
+  }
+
+  // Security methods
+  get isLocked(): boolean {
+    return this.lockedUntil && this.lockedUntil > new Date();
+  }
+
+  get isPasswordResetValid(): boolean {
+    return !!(this.passwordResetToken && this.passwordResetExpires && this.passwordResetExpires > new Date());
+  }
+
+  get isEmailVerificationValid(): boolean {
+    return !!(this.emailVerificationToken && this.emailVerificationExpires && this.emailVerificationExpires > new Date());
   }
 }

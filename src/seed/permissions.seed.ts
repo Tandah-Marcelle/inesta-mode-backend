@@ -83,14 +83,17 @@ export async function seedPermissions(dataSource: DataSource) {
 
   console.log('Permissions seeding completed');
 
-  // Create super admin user with all permissions
+  // Create super admin user with secure setup
   const userRepository = dataSource.getRepository(User);
   const userPermissionRepository = dataSource.getRepository(UserPermission);
 
   let superAdmin = await userRepository.findOne({ where: { email: 'admin@inestamode.com' } });
   
   if (!superAdmin) {
-    const hashedPassword = await bcrypt.hash('admin123', 10);
+    // Generate a secure temporary password
+    const tempPassword = generateSecurePassword();
+    const hashedPassword = await bcrypt.hash(tempPassword, 12);
+    
     superAdmin = userRepository.create({
       firstName: 'Super',
       lastName: 'Admin',
@@ -99,9 +102,21 @@ export async function seedPermissions(dataSource: DataSource) {
       role: UserRole.SUPER_ADMIN,
       isActive: true,
       isEmailVerified: true,
+      requirePasswordChange: true, // Force password change on first login
     });
     superAdmin = await userRepository.save(superAdmin);
-    console.log('Created super admin user: admin@inestamode.com / admin123');
+    
+    console.log('🔐 IMPORTANT SECURITY NOTICE:');
+    console.log('================================');
+    console.log('Super admin user created with secure temporary password.');
+    console.log(`Email: admin@inestamode.com`);
+    console.log(`Temporary Password: ${tempPassword}`);
+    console.log('⚠️  PLEASE CHANGE THIS PASSWORD IMMEDIATELY ON FIRST LOGIN!');
+    console.log('⚠️  This password will only be shown once.');
+    console.log('⚠️  Save this information securely and delete this log.');
+    console.log('================================');
+  } else {
+    console.log('Super admin user already exists - skipping creation');
   }
 
   // Give super admin all permissions
@@ -121,4 +136,25 @@ export async function seedPermissions(dataSource: DataSource) {
   }
   
   console.log('Super admin permissions assigned');
+}
+
+// Utility function to generate secure passwords
+function generateSecurePassword(): string {
+  const length = 16;
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+  let password = '';
+  
+  // Ensure at least one character from each required category
+  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // uppercase
+  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // lowercase
+  password += '0123456789'[Math.floor(Math.random() * 10)]; // number
+  password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // special char
+  
+  // Fill the rest randomly
+  for (let i = 4; i < length; i++) {
+    password += charset[Math.floor(Math.random() * charset.length)];
+  }
+  
+  // Shuffle the password
+  return password.split('').sort(() => Math.random() - 0.5).join('');
 }

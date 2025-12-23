@@ -33,12 +33,12 @@ export class RegisterDto {
 }
 
 export class AuthResponseDto {
-  access_token: string;
+  access_token: string | null;
   user: {
     id: string;
     firstName: string;
     lastName: string;
     email: string;
     role: string;
-  };
+  } | null;
 }
