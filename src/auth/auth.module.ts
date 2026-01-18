@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -22,12 +22,21 @@ import { SecurityLog } from '../entities/security-log.entity';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '1d'),
-        },
-      }),
+      useFactory: async (configService: ConfigService): Promise<JwtModuleOptions> => {
+        const secret = configService.get<string>('JWT_SECRET');
+        const expiresIn = configService.get<string>('JWT_EXPIRES_IN', '1d');
+        
+        if (!secret) {
+          throw new Error('JWT_SECRET is required');
+        }
+        
+        return {
+          secret,
+          signOptions: {
+            expiresIn: expiresIn as any, // Cast to any to avoid type issues
+          },
+        };
+      },
       inject: [ConfigService],
     }),
   ],
